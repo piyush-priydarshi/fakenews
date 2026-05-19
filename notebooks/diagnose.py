@@ -1,6 +1,11 @@
 """
-DIAGNOSTIC SCRIPT: Find out WHY predictions are unreliable
-This script does NOT change anything - it only investigates.
+LABEL & PREPROCESSING MISMATCH DEBUGGER
+========================================
+Checks for:
+1. Label mapping in dataset
+2. Label mapping in saved model
+3. Preprocessing mismatch between app.py and training
+4. Test predictions on known examples
 """
 import pandas as pd
 import pickle
@@ -10,69 +15,30 @@ import sys
 sys.stdout.reconfigure(encoding='utf-8')
 
 # ============================================================
-# DIAGNOSIS 1: Check Label Mapping
+# TASK 1: Inspect dataset labels
 # ============================================================
 print("=" * 60)
-print("DIAGNOSIS 1: LABEL MAPPING CHECK")
+print("TASK 1: DATASET LABEL INSPECTION")
 print("=" * 60)
 
 df = pd.read_csv("../dataset/dataset/fake news detection(FakeNewsNet)/fnn_train.csv")
-print(f"Unique labels: {df['label_fnn'].unique()}")
-print(f"Label distribution:\n{df['label_fnn'].value_counts()}")
+print(f"Unique labels: {df['label_fnn'].unique().tolist()}")
+print(f"Label counts:\n{df['label_fnn'].value_counts()}")
 
-# Spot-check: show a known fake and known real sample
-print("\n--- Sample FAKE news statement ---")
-fake_sample = df[df['label_fnn'] == 'fake']['statement'].iloc[0]
-print(f"Label: fake | Text: {fake_sample[:150]}...")
+# Show specific samples with their labels
+print("\n--- 3 samples labeled 'fake' ---")
+for i, row in df[df['label_fnn'] == 'fake'].head(3).iterrows():
+    print(f"  Label: {row['label_fnn']} | Statement: \"{row['statement'][:100]}\"")
 
-print("\n--- Sample REAL news statement ---")
-real_sample = df[df['label_fnn'] == 'real']['statement'].iloc[0]
-print(f"Label: real | Text: {real_sample[:150]}...")
-
-# ============================================================
-# DIAGNOSIS 2: Training vs Prediction Text Length Mismatch
-# ============================================================
-print("\n" + "=" * 60)
-print("DIAGNOSIS 2: TEXT LENGTH ANALYSIS (ROOT CAUSE!)")
-print("=" * 60)
-
-def clean_text(text):
-    if pd.isna(text):
-        return ""
-    text = str(text).lower()
-    text = re.sub(r'[^a-zA-Z\s]', '', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
-
-# What the model was TRAINED on:
-df['train_text'] = df['statement'].apply(clean_text) + " " + df['fullText_based_content'].apply(clean_text)
-train_lengths = df['train_text'].str.split().str.len()
-
-print(f"Training text word count stats:")
-print(f"  Average: {train_lengths.mean():.0f} words")
-print(f"  Minimum: {train_lengths.min()} words")
-print(f"  Maximum: {train_lengths.max()} words")
-print(f"  Median:  {train_lengths.median():.0f} words")
-
-# What the user types during demo:
-test_headline = "3000 Pound Great White shark captured in great lakes"
-test_words = len(clean_text(test_headline).split())
-print(f"\nUser input word count: {test_words} words")
-print(f"MISMATCH RATIO: Model trained on ~{train_lengths.mean():.0f} words, user inputs ~{test_words} words")
-print(">>> This is likely the ROOT CAUSE of unreliable predictions! <<<")
-
-# What the model was trained on (just statement column):
-stmt_lengths = df['statement'].apply(clean_text).str.split().str.len()
-print(f"\nStatement-only word count stats:")
-print(f"  Average: {stmt_lengths.mean():.0f} words")
-print(f"  Median:  {stmt_lengths.median():.0f} words")
-print(">>> Statement-only length is MUCH closer to what users type! <<<")
+print("\n--- 3 samples labeled 'real' ---")
+for i, row in df[df['label_fnn'] == 'real'].head(3).iterrows():
+    print(f"  Label: {row['label_fnn']} | Statement: \"{row['statement'][:100]}\"")
 
 # ============================================================
-# DIAGNOSIS 3: Current Model's Confidence on Known Examples
+# TASK 2: Check saved model's class mapping
 # ============================================================
 print("\n" + "=" * 60)
-print("DIAGNOSIS 3: CURRENT MODEL PREDICTIONS ON TEST CASES")
+print("TASK 2: SAVED MODEL CLASS MAPPING")
 print("=" * 60)
 
 with open("../models/fake_news_model.pkl", "rb") as f:
@@ -80,74 +46,103 @@ with open("../models/fake_news_model.pkl", "rb") as f:
 with open("../models/tfidf_vectorizer.pkl", "rb") as f:
     vectorizer = pickle.load(f)
 
-test_cases = [
-    ("3000 Pound Great White shark captured in great lakes", "OBVIOUSLY FAKE"),
-    ("Scientists discover high sugar diet is actually good for children", "OBVIOUSLY FAKE"),
-    ("President signs new infrastructure bill into law", "LIKELY REAL"),
-    ("NASA confirms alien life found on Mars next week", "OBVIOUSLY FAKE"),
-    ("Economy adds 200000 jobs in latest monthly report", "LIKELY REAL"),
-]
-
-print(f"\nModel classes: {model.classes_}")
-
-for text, expected in test_cases:
-    cleaned = clean_text(text)
-    vec = vectorizer.transform([cleaned])
-    pred = model.predict(vec)[0]
-    probs = model.predict_proba(vec)[0]
-    fake_prob = probs[list(model.classes_).index('fake')] * 100
-    real_prob = probs[list(model.classes_).index('real')] * 100
-    
-    status = "CORRECT" if (expected.startswith("OBVIOUSLY FAKE") and pred == "fake") or (expected.startswith("LIKELY REAL") and pred == "real") else "WRONG"
-    print(f"\n  Input: \"{text}\"")
-    print(f"  Expected: {expected} | Predicted: {pred.upper()} | Fake: {fake_prob:.1f}% | Real: {real_prob:.1f}% | {status}")
+print(f"model.classes_ = {model.classes_}")
+print(f"  Index 0 = '{model.classes_[0]}'")
+print(f"  Index 1 = '{model.classes_[1]}'")
+print(f"\nWhen model.predict_proba() returns [p0, p1]:")
+print(f"  p0 = probability of '{model.classes_[0]}'")
+print(f"  p1 = probability of '{model.classes_[1]}'")
 
 # ============================================================
-# DIAGNOSIS 4: What if we train on STATEMENT ONLY?
+# TASK 3: Check preprocessing mismatch
 # ============================================================
 print("\n" + "=" * 60)
-print("DIAGNOSIS 4: STATEMENT-ONLY MODEL COMPARISON")
+print("TASK 3: PREPROCESSING MISMATCH CHECK")
 print("=" * 60)
 
-from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
+# What the MODEL was trained with (NLTK stemming + stopwords):
+import nltk
+nltk.download('stopwords', quiet=True)
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+STOP_WORDS = set(stopwords.words('english'))
+stemmer = PorterStemmer()
 
-# Load all data
-df2 = pd.concat([
-    pd.read_csv("../dataset/dataset/fake news detection(FakeNewsNet)/fnn_train.csv"),
-    pd.read_csv("../dataset/dataset/fake news detection(FakeNewsNet)/fnn_dev.csv"),
-    pd.read_csv("../dataset/dataset/fake news detection(FakeNewsNet)/fnn_test.csv"),
-], ignore_index=True)
+def clean_text_TRAINING(text):
+    """What train_model.py uses"""
+    if pd.isna(text) or not text:
+        return ""
+    text = str(text).lower()
+    text = re.sub(r'http\S+|www\S+', '', text)
+    text = re.sub(r'\d+', '', text)
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    words = [stemmer.stem(w) for w in text.split() if w not in STOP_WORDS and len(w) > 2]
+    return ' '.join(words)
 
-df2['clean_stmt'] = df2['statement'].apply(clean_text)
-df2 = df2[df2['clean_stmt'].str.len() > 5]
+def clean_text_APP(text):
+    """What the CURRENT app.py uses (user reverted it!)"""
+    if not text:
+        return ""
+    text = str(text).lower()
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
-X = df2['clean_stmt']
-y = df2['label_fnn']
+test_input = "ISRO successfully launches satellite into orbit"
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+training_cleaned = clean_text_TRAINING(test_input)
+app_cleaned = clean_text_APP(test_input)
 
-vec2 = TfidfVectorizer(stop_words='english', max_df=0.7, min_df=2, ngram_range=(1,2), max_features=30000, sublinear_tf=True)
-X_train_v = vec2.fit_transform(X_train)
-X_test_v = vec2.transform(X_test)
+print(f"Original:         \"{test_input}\"")
+print(f"Training cleaning: \"{training_cleaned}\"")
+print(f"App.py cleaning:   \"{app_cleaned}\"")
+print(f"\nMATCH: {'YES' if training_cleaned == app_cleaned else 'NO - MISMATCH FOUND!'}")
 
-model2 = LogisticRegression(max_iter=1000, C=10)
-model2.fit(X_train_v, y_train)
-acc = accuracy_score(y_test, model2.predict(X_test_v))
-print(f"Statement-only model accuracy: {acc*100:.2f}%")
+if training_cleaned != app_cleaned:
+    print("\n  >>> BUG FOUND: app.py uses DIFFERENT text cleaning than train_model.py!")
+    print("  >>> The model was trained with NLTK stemming + stopword removal,")
+    print("  >>> but app.py does NOT apply these. This causes wrong predictions!")
 
-print("\nStatement-only model predictions on test cases:")
+# ============================================================
+# TASK 4: Test predictions with CORRECT vs WRONG preprocessing
+# ============================================================
+print("\n" + "=" * 60)
+print("TASK 4: PREDICTION COMPARISON (correct vs wrong preprocessing)")
+print("=" * 60)
+
+test_cases = [
+    ("ISRO successfully launches satellite into orbit", "REAL"),
+    ("RBI announces new monetary policy keeping repo rate unchanged", "REAL"),
+    ("3000 Pound Great White shark captured in great lakes", "FAKE"),
+    ("COVID vaccine contains microchips to track citizens", "FAKE"),
+    ("Election Commission announces schedule for state elections", "REAL"),
+    ("Aliens discovered living under Taj Mahal", "FAKE"),
+    ("Chocolate cures cancer says new study", "FAKE"),
+]
+
+print(f"\n{'Input':<55} {'Expected':<8} {'Correct Prep':<15} {'Wrong Prep':<15}")
+print("-" * 95)
+
 for text, expected in test_cases:
-    cleaned = clean_text(text)
-    vec_t = vec2.transform([cleaned])
-    pred = model2.predict(vec_t)[0]
-    probs = model2.predict_proba(vec_t)[0]
-    fake_prob = probs[list(model2.classes_).index('fake')] * 100
-    real_prob = probs[list(model2.classes_).index('real')] * 100
-    status = "CORRECT" if (expected.startswith("OBVIOUSLY FAKE") and pred == "fake") or (expected.startswith("LIKELY REAL") and pred == "real") else "WRONG"
-    print(f"  \"{text[:60]}...\" => {pred.upper()} (Fake:{fake_prob:.1f}% Real:{real_prob:.1f}%) {status}")
+    # With CORRECT preprocessing (matching training)
+    correct_clean = clean_text_TRAINING(text)
+    vec_correct = vectorizer.transform([correct_clean])
+    pred_correct = model.predict(vec_correct)[0]
+    probs_correct = model.predict_proba(vec_correct)[0]
+    fi = list(model.classes_).index('fake')
+    ri = list(model.classes_).index('real')
+    
+    # With WRONG preprocessing (what current app.py does)
+    wrong_clean = clean_text_APP(text)
+    vec_wrong = vectorizer.transform([wrong_clean])
+    pred_wrong = model.predict(vec_wrong)[0]
+    probs_wrong = model.predict_proba(vec_wrong)[0]
+    
+    c_str = f"{pred_correct.upper()} F:{probs_correct[fi]*100:.0f}%"
+    w_str = f"{pred_wrong.upper()} F:{probs_wrong[fi]*100:.0f}%"
+    
+    print(f"{text[:53]:<55} {expected:<8} {c_str:<15} {w_str:<15}")
 
 print("\n" + "=" * 60)
 print("DIAGNOSIS COMPLETE")
