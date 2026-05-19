@@ -26,7 +26,7 @@ These should instantly tell the story:
 * **Total News Analyzed**: (Count of rows)
 * **Fake News Detected**: (Count where Prediction = Fake)
 * **Average AI Confidence**: (Average of Confidence Percentage)
-* **Model Accuracy**: (Example: 63.6%)
+* **Model Accuracy**: (Example: 69.6%)
 
 ### 2. Donut Chart: Fake vs Real Distribution
 * **Values**: Count of News

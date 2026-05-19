@@ -16,7 +16,7 @@ Winning a hackathon isn't just about the code; it's about how you sell the idea!
 
 ## Slide 3: Architecture Diagram
 *Create a simple visual showing the flow of data:*
-`User Input ➔ Text Cleaning ➔ TF-IDF Vectorization ➔ Logistic Regression Model ➔ Prediction & Confidence Score ➔ Voice Synthesis (pyttsx3) & Power BI Dashboard.`
+`User Input ➔ Text Cleaning ➔ TF-IDF Vectorization ➔ Random Forest Model ➔ Prediction & Confidence Score ➔ Voice Synthesis (pyttsx3) & Power BI Dashboard.`
 
 ## Slide 4: The Live Demo (CRITICAL!)
 * Do not just show screenshots! Run `app.py`.
@@ -25,7 +25,7 @@ Winning a hackathon isn't just about the code; it's about how you sell the idea!
 * *Show the confidence percentage*. Judges love transparency in AI (it's not a black box).
 
 ## Slide 5: Evaluation & Business Impact
-* **Accuracy**: We achieved ~64% accuracy using a lightweight, lightning-fast Logistic Regression model. 
+* **Accuracy**: We achieved ~70% accuracy and an F1 Score of 0.70 using an advanced Random Forest ensemble model. 
 * *(Note: Tell judges that for a production system, you would upgrade to Deep Learning (BERT), but for a low-latency MVP, this proves the concept works).*
 * **Business Impact**: Saves thousands of hours for moderation teams. Voice alerts allow moderators to keep their eyes on other screens.
 
@@ -39,8 +39,8 @@ Winning a hackathon isn't just about the code; it's about how you sell the idea!
 
 ## 🙋‍♂️ Judge Q&A Preparation
 
-**Q: Why did you use TF-IDF and Logistic Regression instead of Deep Learning?**
-**A**: *"For a hackathon MVP, we prioritized speed, low computational cost, and explainability. Logistic Regression gives us a clear confidence score. Deep learning requires GPUs and longer training times, which we plan to implement in Phase 2."*
+**Q: Why did you use TF-IDF and Random Forest instead of Deep Learning?**
+**A**: *"For a hackathon MVP, we prioritized speed, low computational cost, and explainability. Random Forest gives us a robust confidence score and handles complex word interactions better than simple linear models. Deep learning requires GPUs and longer training times, which we plan to implement in Phase 2."*
 
 **Q: How did you handle the dataset?**
 **A**: *"We used the FakeNewsNet dataset with over 15,000 records. We ensured the data was perfectly balanced between real and fake to avoid AI bias, and we split it 80/20 for training and testing."*
