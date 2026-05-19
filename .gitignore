@@ -1,0 +1,23 @@
+# Python virtual environment
+venv/
+env/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# IDEs and Editors
+.vscode/
+.idea/
+
+# Large Datasets
+dataset/
+*.csv
+*.zip
+
+# OS files
+.DS_Store
+
+# Ignore the models if they are too large, but we can keep small ones.
+# models/
