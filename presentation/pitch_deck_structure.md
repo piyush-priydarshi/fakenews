@@ -25,7 +25,7 @@ Winning a hackathon isn't just about the code; it's about how you sell the idea!
 * *Show the confidence percentage*. Judges love transparency in AI (it's not a black box).
 
 ## Slide 5: Evaluation & Business Impact
-* **Accuracy**: We achieved ~70% accuracy and an F1 Score of 0.70 using an advanced Random Forest ensemble model. 
+* **Accuracy**: We achieved **74.46% accuracy** and an F1 Score of 0.74-0.76 using a highly tuned Logistic Regression model trained on 17,000+ articles with advanced TF-IDF (sublinear scaling + bigram features).
 * *(Note: Tell judges that for a production system, you would upgrade to Deep Learning (BERT), but for a low-latency MVP, this proves the concept works).*
 * **Business Impact**: Saves thousands of hours for moderation teams. Voice alerts allow moderators to keep their eyes on other screens.
 

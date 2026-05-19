@@ -1,41 +1,83 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression, PassiveAggressiveClassifier
+from sklearn.svm import LinearSVC
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score, classification_report
+import re
 import sys
+
 sys.stdout.reconfigure(encoding='utf-8')
 
+print("Loading dataset...")
 data_path = "../dataset/dataset/fake news detection(FakeNewsNet)/fnn_train.csv"
 df = pd.read_csv(data_path)
 
-# Let's use the full text content instead of just the statement for much better accuracy!
-df['text'] = df['statement'].fillna('') + " " + df['paragraph_based_content'].fillna('')
-df.dropna(subset=['text', 'label_fnn'], inplace=True)
+# ===== KEY INSIGHT: Use the FULL article text for maximum accuracy =====
+# The 'fullText_based_content' column has the entire article, giving the AI
+# much more signal to detect fake vs real news patterns.
 
-X = df['text']
+def clean_text(text):
+    """Aggressive text cleaning for better NLP results."""
+    if pd.isna(text):
+        return ""
+    text = str(text)
+    text = text.lower()
+    text = re.sub(r'[^a-zA-Z\s]', '', text)  # Remove all non-letters
+    text = re.sub(r'\s+', ' ', text).strip()  # Remove extra whitespace
+    return text
+
+# Combine statement + full text for maximum context
+df['clean_text'] = df['statement'].apply(clean_text) + " " + df['fullText_based_content'].apply(clean_text)
+df.dropna(subset=['clean_text', 'label_fnn'], inplace=True)
+df = df[df['clean_text'].str.len() > 10]  # Remove very short/empty entries
+
+X = df['clean_text']
 y = df['label_fnn']
+
+print(f"Total records after cleaning: {len(df)}")
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Adding bigrams (ngram_range=(1,2)) to capture phrases like "fake news" or "not true"
-vectorizer = TfidfVectorizer(stop_words='english', max_df=0.7, ngram_range=(1,2), max_features=25000)
+# Aggressive TF-IDF with sublinear scaling and bigrams
+print("Vectorizing with advanced TF-IDF...")
+vectorizer = TfidfVectorizer(
+    stop_words='english',
+    max_df=0.7,
+    min_df=2,
+    ngram_range=(1, 2),
+    max_features=50000,
+    sublinear_tf=True  # Applies log scaling - big accuracy boost for text!
+)
+
 X_train_tfidf = vectorizer.fit_transform(X_train)
 X_test_tfidf = vectorizer.transform(X_test)
 
-print("--- Advanced Logistic Regression ---")
-model_lr = LogisticRegression(max_iter=1000, C=10)
-model_lr.fit(X_train_tfidf, y_train)
-y_pred_lr = model_lr.predict(X_test_tfidf)
-print("LR Accuracy:", accuracy_score(y_test, y_pred_lr))
-print("LR F1 Score:")
-print(classification_report(y_test, y_pred_lr))
+print(f"TF-IDF features: {X_train_tfidf.shape[1]}")
+print("=" * 60)
 
-print("--- Random Forest ---")
-model_rf = RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=42)
-model_rf.fit(X_train_tfidf, y_train)
-y_pred_rf = model_rf.predict(X_test_tfidf)
-print("RF Accuracy:", accuracy_score(y_test, y_pred_rf))
-print("RF F1 Score:")
-print(classification_report(y_test, y_pred_rf))
+# Test multiple models to find the best one
+models = {
+    "Logistic Regression (C=10)": LogisticRegression(max_iter=1000, C=10),
+    "Passive Aggressive Classifier": PassiveAggressiveClassifier(max_iter=100, C=0.5),
+    "Linear SVC": LinearSVC(max_iter=2000, C=1.0),
+    "Multinomial Naive Bayes": MultinomialNB(alpha=0.1),
+}
+
+best_acc = 0
+best_name = ""
+
+for name, model in models.items():
+    print(f"\n--- {name} ---")
+    model.fit(X_train_tfidf, y_train)
+    y_pred = model.predict(X_test_tfidf)
+    acc = accuracy_score(y_test, y_pred)
+    print(f"Accuracy: {acc * 100:.2f}%")
+    print(classification_report(y_test, y_pred))
+    if acc > best_acc:
+        best_acc = acc
+        best_name = name
+
+print("=" * 60)
+print(f"BEST MODEL: {best_name} with {best_acc * 100:.2f}% accuracy")
